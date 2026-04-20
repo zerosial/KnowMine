@@ -32,20 +32,28 @@ function formatDate(isoStr) {
 
 export default function DocumentCard({ doc, onDeleted, style }) {
   const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const ft = FILE_TYPE_CONFIG[doc.file_type] || FILE_TYPE_CONFIG.unknown
   const st = STATUS_CONFIG[doc.status] || STATUS_CONFIG.pending
 
-  const handleDelete = async (e) => {
+  const handleDeleteClick = (e) => {
     e.stopPropagation()
-    if (!confirm(`"${doc.filename}"을 삭제하시겠습니까?`)) return
-    setDeleting(true)
-    try {
-      await deleteDocument(doc.doc_id)
-      onDeleted?.(doc.doc_id)
-    } catch (err) {
-      alert(`삭제 실패: ${err.message}`)
-      setDeleting(false)
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      // 3초 후 삭제 확인 취소
+      setTimeout(() => setConfirmDelete(false), 3000)
+      return
     }
+    
+    // 두 번 누르면 실제 삭제 실행
+    setDeleting(true)
+    deleteDocument(doc.doc_id)
+      .then(() => onDeleted?.(doc.doc_id))
+      .catch(err => {
+        alert(`삭제 실패: ${err.message}`)
+        setDeleting(false)
+        setConfirmDelete(false)
+      })
   }
 
   return (
@@ -103,19 +111,34 @@ export default function DocumentCard({ doc, onDeleted, style }) {
 
         {/* 삭제 버튼 */}
         <button
-          onClick={handleDelete}
+          onClick={handleDeleteClick}
           disabled={deleting}
-          title="삭제"
+          title={confirmDelete ? "한 번 더 누르면 삭제됩니다" : "삭제"}
           style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'rgba(255,255,255,0.25)', fontSize: 16,
-            padding: '4px', borderRadius: 6, flexShrink: 0,
-            transition: 'color 0.2s, background 0.2s',
+            background: confirmDelete ? 'rgba(248,113,113,0.2)' : 'none',
+            border: confirmDelete ? '1px solid rgba(248,113,113,0.5)' : 'none',
+            cursor: deleting ? 'not-allowed' : 'pointer',
+            color: confirmDelete ? '#f87171' : 'rgba(255,255,255,0.25)',
+            fontSize: confirmDelete ? 12 : 16,
+            fontWeight: confirmDelete ? 700 : 400,
+            padding: confirmDelete ? '4px 10px' : '4px',
+            borderRadius: 6, flexShrink: 0,
+            transition: 'all 0.2s',
           }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; e.currentTarget.style.background = 'rgba(248,113,113,0.1)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.25)'; e.currentTarget.style.background = 'none' }}
+          onMouseEnter={e => { 
+            if (!confirmDelete) {
+              e.currentTarget.style.color = '#f87171'; 
+              e.currentTarget.style.background = 'rgba(248,113,113,0.1)';
+            }
+          }}
+          onMouseLeave={e => { 
+            if (!confirmDelete) {
+              e.currentTarget.style.color = 'rgba(255,255,255,0.25)'; 
+              e.currentTarget.style.background = 'none';
+            }
+          }}
         >
-          {deleting ? '⏳' : '🗑'}
+          {deleting ? '⏳' : confirmDelete ? '삭제 확인' : '🗑'}
         </button>
       </div>
 

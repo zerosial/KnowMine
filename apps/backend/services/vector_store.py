@@ -197,6 +197,22 @@ def delete_document_chunks(doc_id: str):
     col.delete(where={"doc_id": doc_id})
 
 
+def delete_document(doc_id: str):
+    """문서 메타데이터와 관련된 모든 청크를 삭제"""
+    # 1. 청크 삭제
+    try:
+        delete_document_chunks(doc_id)
+    except Exception:
+        pass
+    
+    # 2. 메타데이터 삭제
+    meta_col = get_meta_collection()
+    try:
+        meta_col.delete(ids=[doc_id])
+    except Exception:
+        pass
+
+
 # ─────────────────────────────────────────────
 # 통계
 # ─────────────────────────────────────────────

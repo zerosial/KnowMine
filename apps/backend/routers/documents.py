@@ -57,6 +57,17 @@ async def get_document(doc_id: str):
     )
 
 
+@router.delete("/{doc_id}")
+async def delete_document_endpoint(doc_id: str):
+    """문서 및 관련 청크 삭제"""
+    meta = vector_store.get_document_meta(doc_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="문서를 찾을 수 없습니다.")
+
+    vector_store.delete_document(doc_id)
+    return {"message": f"문서({doc_id})가 삭제되었습니다."}
+
+
 @router.get("/stats", response_model=StatsResponse)
 async def get_stats():
     """전체 통계 반환"""

@@ -220,12 +220,10 @@ def parse_pdf(file_bytes: bytes, filename: str) -> str:
                     if not text:
                         continue
 
-                    # 폰트 크기로 heading 레벨 결정
+                    # 폰트 크기로 heading 레벨 결정 (너무 잦은 헤더 분할을 막기 위해 20pt 이상만 제목으로 취급)
                     font_size = spans[0].get("size", 12)
-                    if font_size >= 18:
+                    if font_size >= 20:
                         page_md.append(f"\n### {text}")
-                    elif font_size >= 14:
-                        page_md.append(f"\n#### {text}")
                     else:
                         page_md.append(text)
 
