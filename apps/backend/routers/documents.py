@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 from models.schemas import DocumentResponse, StatsResponse
-from services import vector_store
+from services import vector_store, ai_service
 from services.embedder import embed_query
 
 router = APIRouter()
@@ -114,3 +114,74 @@ async def search_documents(req: SearchRequest):
         )
         for r in results
     ]
+
+
+# ─────────────────────────────────────────────
+# AI 질문 (RAG)
+# ─────────────────────────────────────────────
+
+class AskRequest(BaseModel):
+    query: str
+    top_k: int = 5
+    doc_id: Optional[str] = None
+
+
+class AskResponse(BaseModel):
+    answer: str
+    sources: List[SearchResult]
+    model: str
+    tokens_used: int
+
+
+@router.post("/ask", response_model=AskResponse)
+async def ask_question(req: AskRequest):
+    """AI 기반 문서 질문 답변 (RAG)"""
+    if not req.query.strip():
+        raise HTTPException(status_code=400, detail="질문을 입력해주세요.")
+
+    # 1. 벡터 검색
+    query_embedding = embed_query(req.query)
+    results = vector_store.search_similar(
+        query_embedding=query_embedding,
+        top_k=req.top_k,
+        doc_id=req.doc_id,
+    )
+
+    if not results:
+        return AskResponse(
+            answer="업로드된 문서에서 관련 내용을 찾을 수 없습니다. 먼저 문서를 업로드해주세요.",
+            sources=[],
+            model=ai_service.get_model(),
+            tokens_used=0,
+        )
+
+    # 2. 검색 결과를 AI 컨텍스트로 전달
+    context_chunks = [
+        {
+            "text": r["text"],
+            "filename": r["metadata"].get("filename", ""),
+            "score": r["score"],
+        }
+        for r in results
+    ]
+
+    ai_result = ai_service.generate_answer(req.query, context_chunks)
+
+    # 3. 출처 정보 구성
+    sources = [
+        SearchResult(
+            chunk_id=r["chunk_id"],
+            text=r["text"],
+            filename=r["metadata"].get("filename", ""),
+            score=r["score"],
+            headers=r["metadata"].get("headers", "{}"),
+        )
+        for r in results
+    ]
+
+    return AskResponse(
+        answer=ai_result["answer"],
+        sources=sources,
+        model=ai_result["model"],
+        tokens_used=ai_result["tokens_used"],
+    )

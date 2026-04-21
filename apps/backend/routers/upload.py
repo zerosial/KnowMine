@@ -18,6 +18,7 @@ from models.schemas import (
 from services.parser import parse_file, detect_file_type
 from services.chunker import semantic_chunk
 from services.embedder import embed_texts
+from services.ai_service import enrich_chunk, is_enrichment_enabled
 from services import vector_store
 
 router = APIRouter()
@@ -104,6 +105,19 @@ async def process_document_pipeline(doc_id: str, file_bytes: bytes, filename: st
 
         if not chunks:
             raise ValueError("파싱된 청크가 없습니다. 파일 내용을 확인해주세요.")
+
+        # 2.5단계: AI 정제 (선택적)
+        if is_enrichment_enabled():
+            print(f"[{doc_id}] 🤖 AI 정제 시작 ({len(chunks)} chunks)...")
+            enriched_count = 0
+            for i, chunk in enumerate(chunks):
+                original_text = chunk["text"]
+                enriched_text = enrich_chunk(original_text, filename)
+                if enriched_text != original_text:
+                    chunk["text"] = enriched_text
+                    chunk["char_count"] = len(enriched_text)
+                    enriched_count += 1
+            print(f"[{doc_id}] ✅ AI 정제 완료: {enriched_count}/{len(chunks)} chunks enriched")
 
         # 3단계: 임베딩
         texts = [c["text"] for c in chunks]

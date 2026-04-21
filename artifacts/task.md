@@ -7,10 +7,14 @@
 - [x] `schemas.py` Pydantic 모델 (DocumentMeta, ProcessingStatus, StatsResponse 등)
 - [x] `parser.py` — Excel/PPT/PDF → Markdown 변환 (표 구조·계층 보존)
 - [x] `chunker.py` — Semantic chunking (헤더→재귀 2단계)
-- [x] `embedder.py` — BGE-M3 로컬 임베딩 (싱글턴 패턴)
+- [x] `embedder.py` — BGE-M3 로컬 임베딩
 - [x] `vector_store.py` — ChromaDB CRUD (docs + meta 컬렉션 분리)
 - [x] `routers/upload.py` — POST /api/upload + BackgroundTask 파이프라인
 - [x] `routers/documents.py` — GET /api/documents, stats, search, DELETE
+- [x] `services/ai_service.py` 생성 (RAG 답변 + 청크 정제)
+- [x] `routers/documents.py`에 `POST /api/ask` 엔드포인트 추가
+- [x] `routers/upload.py` 파이프라인에 AI 정제 단계 추가
+- [x] 백엔드 서버 로직 반영 완료
 
 ## Frontend ✅
 - [x] React 19 + Vite 8 프로젝트 초기화
@@ -22,6 +26,8 @@
 - [x] `SearchPanel.jsx` — AI 유사도 검색 (유사도 퍼센트 표시)
 - [x] `Dashboard.jsx` — 메인 페이지 (폴링, 탭, 배경 블롭)
 - [x] `api/client.js` — FastAPI 통신 함수
+- [x] `api/client.js`에 `askQuestion` 함수 추가
+- [x] `SearchPanel.jsx`에 AI 질문 모드 UI 추가
 
 ## Infra ✅
 - [x] `docker-compose.yml` (backend + frontend 서비스)

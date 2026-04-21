@@ -61,6 +61,16 @@ export async function searchDocuments({ query, topK = 5, docId = null }) {
   return handleResponse(res)
 }
 
+/** AI 질문 답변 (RAG) */
+export async function askQuestion({ query, topK = 5, docId = null }) {
+  const res = await fetch(`${BASE_URL}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, top_k: topK, doc_id: docId }),
+  })
+  return handleResponse(res)
+}
+
 /** 서버 헬스 체크 */
 export async function checkHealth() {
   try {

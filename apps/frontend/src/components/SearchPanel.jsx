@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { searchDocuments } from '../api/client'
+import { searchDocuments, askQuestion } from '../api/client'
 
 // ─────────────────────────────────────────────
 // 청크 텍스트에서 마크다운 헤더(##, ###)를 파싱해
@@ -12,7 +12,6 @@ function parseChunkText(rawText) {
 
   for (const line of lines) {
     const trimmed = line.trim()
-    // 마크다운 헤더는 위치 정보로 분류
     if (/^#{1,4}\s/.test(trimmed)) {
       const label = trimmed.replace(/^#{1,4}\s+/, '')
       if (label) locationParts.push(label)
@@ -27,13 +26,15 @@ function parseChunkText(rawText) {
   }
 }
 
-// 유사도 점수 → 색상 + 텍스트
 function scoreInfo(score) {
   if (score >= 0.65) return { color: '#34d399', label: '높음', bg: 'rgba(52,211,153,0.1)' }
   if (score >= 0.45) return { color: '#fbbf24', label: '보통', bg: 'rgba(251,191,36,0.1)' }
   return { color: '#94a3b8', label: '낮음', bg: 'rgba(148,163,184,0.08)' }
 }
 
+// ─────────────────────────────────────────────
+// 결과 카드 (벡터 검색 + AI 출처 공용)
+// ─────────────────────────────────────────────
 function ResultCard({ result, index, expanded, onToggle }) {
   const { location, body } = parseChunkText(result.text)
   const si = scoreInfo(result.score)
@@ -47,7 +48,6 @@ function ResultCard({ result, index, expanded, onToggle }) {
       transition: 'all 0.2s',
       overflow: 'hidden',
     }}>
-      {/* ── 카드 헤더 ── */}
       <div
         onClick={onToggle}
         style={{
@@ -59,7 +59,6 @@ function ResultCard({ result, index, expanded, onToggle }) {
           userSelect: 'none',
         }}
       >
-        {/* 순위 */}
         <span style={{
           minWidth: 22, height: 22,
           background: 'rgba(99,102,241,0.2)',
@@ -69,7 +68,6 @@ function ResultCard({ result, index, expanded, onToggle }) {
           flexShrink: 0, marginTop: 1,
         }}>{index + 1}</span>
 
-        {/* 파일명 + 위치 */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{
             fontSize: '0.78rem', fontWeight: 600, color: '#c4b5fd',
@@ -96,7 +94,6 @@ function ResultCard({ result, index, expanded, onToggle }) {
           )}
         </div>
 
-        {/* 유사도 뱃지 */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
           <span style={{
             fontSize: '0.8rem', fontWeight: 800,
@@ -111,7 +108,6 @@ function ResultCard({ result, index, expanded, onToggle }) {
           </span>
         </div>
 
-        {/* 펼치기 화살표 */}
         <span style={{
           color: 'rgba(255,255,255,0.25)',
           fontSize: 12, flexShrink: 0, marginTop: 2,
@@ -120,11 +116,8 @@ function ResultCard({ result, index, expanded, onToggle }) {
         }}>▶</span>
       </div>
 
-      {/* ── 본문 미리보기 (항상 표시) ── */}
       {body && !expanded && (
-        <div style={{
-          padding: '0 16px 12px 48px',
-        }}>
+        <div style={{ padding: '0 16px 12px 48px' }}>
           <p style={{
             fontSize: '0.78rem',
             color: 'rgba(255,255,255,0.5)',
@@ -137,7 +130,6 @@ function ResultCard({ result, index, expanded, onToggle }) {
         </div>
       )}
 
-      {/* ── 전체 내용 (펼쳤을 때) ── */}
       {expanded && (
         <div style={{ padding: '0 16px 16px 16px' }}>
           <div style={{
@@ -146,7 +138,6 @@ function ResultCard({ result, index, expanded, onToggle }) {
             padding: '12px 14px',
             border: '1px solid rgba(255,255,255,0.06)',
           }}>
-            {/* 원본 위치 태그 */}
             {location && (
               <p style={{
                 fontSize: '0.68rem', fontWeight: 600,
@@ -157,7 +148,6 @@ function ResultCard({ result, index, expanded, onToggle }) {
                 📍 {location}
               </p>
             )}
-            {/* 전체 본문 */}
             <p style={{
               fontSize: '0.8rem',
               color: 'rgba(255,255,255,0.75)',
@@ -169,8 +159,6 @@ function ResultCard({ result, index, expanded, onToggle }) {
               {body || '(본문이 없습니다 — 헤더/메타 청크)'}
             </p>
           </div>
-
-          {/* 청크 ID (개발용) */}
           <p style={{
             marginTop: 8, fontSize: '0.62rem',
             color: 'rgba(255,255,255,0.12)',
@@ -180,6 +168,64 @@ function ResultCard({ result, index, expanded, onToggle }) {
           </p>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// AI 답변 표시 컴포넌트
+// ─────────────────────────────────────────────
+function AiAnswerBox({ answer, model, tokensUsed }) {
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06))',
+      borderRadius: 14,
+      border: '1px solid rgba(99,102,241,0.2)',
+      padding: '20px',
+      marginBottom: 16,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* 장식 라인 */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+        background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #a78bfa)',
+      }} />
+
+      {/* 헤더 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8,
+          background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 14, boxShadow: '0 0 12px rgba(99,102,241,0.3)',
+        }}>🤖</div>
+        <span style={{
+          fontSize: '0.82rem', fontWeight: 700,
+          color: '#c4b5fd',
+        }}>AI 답변</span>
+        <span style={{
+          marginLeft: 'auto',
+          fontSize: '0.62rem', color: 'rgba(255,255,255,0.2)',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {model} · {tokensUsed} tokens
+        </span>
+      </div>
+
+      {/* 답변 본문 */}
+      <div style={{
+        fontSize: '0.85rem',
+        color: 'rgba(255,255,255,0.85)',
+        lineHeight: 1.9,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        fontFamily: 'var(--font-body)',
+      }}>
+        {answer}
+      </div>
     </div>
   )
 }
@@ -196,6 +242,10 @@ export default function SearchPanel() {
   const [expandedId, setExpandedId] = useState(null)
   const [topK, setTopK] = useState(5)
 
+  // AI 질문 모드
+  const [mode, setMode] = useState('ai') // 'search' | 'ai'
+  const [aiAnswer, setAiAnswer] = useState(null) // {answer, model, tokens_used, sources}
+
   const handleSearch = async (e) => {
     e?.preventDefault()
     if (!query.trim()) return
@@ -203,12 +253,26 @@ export default function SearchPanel() {
     setLoading(true)
     setError(null)
     setExpandedId(null)
+    setAiAnswer(null)
+
     try {
-      const data = await searchDocuments({ query, topK })
-      setResults(data)
-      setSearched(true)
-      // 첫 결과 자동 펼침
-      if (data.length > 0) setExpandedId(data[0].chunk_id)
+      if (mode === 'ai') {
+        // AI 질문 모드
+        const data = await askQuestion({ query, topK })
+        setAiAnswer({
+          answer: data.answer,
+          model: data.model,
+          tokensUsed: data.tokens_used,
+        })
+        setResults(data.sources || [])
+        setSearched(true)
+      } else {
+        // 벡터 검색 모드
+        const data = await searchDocuments({ query, topK })
+        setResults(data)
+        setSearched(true)
+        if (data.length > 0) setExpandedId(data[0].chunk_id)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -222,6 +286,40 @@ export default function SearchPanel() {
 
   return (
     <div>
+      {/* ── 모드 선택 ── */}
+      <div style={{
+        display: 'flex', gap: 4, marginBottom: 14,
+        background: 'rgba(255,255,255,0.03)',
+        borderRadius: 10, padding: 4,
+      }}>
+        {[
+          { key: 'ai', label: '🤖 AI 질문', desc: 'AI가 문서를 읽고 답변' },
+          { key: 'search', label: '🔍 벡터 검색', desc: '유사도 기반 원문 검색' },
+        ].map(m => (
+          <button
+            key={m.key}
+            onClick={() => { setMode(m.key); setAiAnswer(null); setResults([]); setSearched(false) }}
+            title={m.desc}
+            style={{
+              flex: 1, padding: '8px 12px',
+              borderRadius: 8, border: 'none', cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+              fontSize: '0.82rem', fontWeight: 600,
+              transition: 'all 0.2s',
+              background: mode === m.key
+                ? m.key === 'ai'
+                  ? 'linear-gradient(135deg, rgba(99,102,241,0.35), rgba(139,92,246,0.35))'
+                  : 'linear-gradient(135deg, rgba(52,211,153,0.25), rgba(16,185,129,0.25))'
+                : 'transparent',
+              color: mode === m.key ? '#e2e8f0' : 'rgba(255,255,255,0.3)',
+              boxShadow: mode === m.key ? '0 2px 10px rgba(99,102,241,0.15)' : 'none',
+            }}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
       {/* ── 검색 입력 ── */}
       <form onSubmit={handleSearch} style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -229,12 +327,16 @@ export default function SearchPanel() {
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="자연어로 검색하세요... (예: 병가 조건, TC 결제 오류, 배너 디폴트 이미지)"
+            placeholder={
+              mode === 'ai'
+                ? "문서에 대해 질문하세요... (예: 병가 조건이 뭐야?)"
+                : "자연어로 검색하세요... (예: 병가, TC 결제 오류)"
+            }
             style={{
               flex: 1,
               padding: '10px 16px',
               background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: `1px solid ${mode === 'ai' ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.1)'}`,
               borderRadius: 10,
               color: '#e2e8f0',
               fontSize: '0.875rem',
@@ -242,18 +344,28 @@ export default function SearchPanel() {
               outline: 'none',
               transition: 'border-color 0.2s',
             }}
-            onFocus={e => e.target.style.borderColor = 'rgba(99,102,241,0.6)'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+            onFocus={e => e.target.style.borderColor = mode === 'ai' ? 'rgba(99,102,241,0.6)' : 'rgba(52,211,153,0.6)'}
+            onBlur={e => e.target.style.borderColor = mode === 'ai' ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.1)'}
             disabled={loading}
           />
-          <button type="submit" className="btn-primary" disabled={loading || !query.trim()}>
-            {loading ? <span className="animate-spin-slow">⚙️</span> : '🔍'} 검색
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={loading || !query.trim()}
+            style={mode === 'ai' ? {
+              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+            } : undefined}
+          >
+            {loading
+              ? <span className="animate-spin-slow">⚙️</span>
+              : mode === 'ai' ? '🤖' : '🔍'}
+            {' '}{mode === 'ai' ? '질문' : '검색'}
           </button>
         </div>
 
         {/* 결과 수 조절 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>결과 수:</span>
+          <span style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>참조 문서 수:</span>
           {[3, 5, 10].map(n => (
             <button
               key={n}
@@ -272,9 +384,15 @@ export default function SearchPanel() {
               {n}개
             </button>
           ))}
-          <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'rgba(255,255,255,0.2)' }}>
-            결과 클릭 시 전체 내용 표시
-          </span>
+          {mode === 'ai' && (
+            <span style={{
+              marginLeft: 'auto', fontSize: '0.68rem',
+              color: 'rgba(99,102,241,0.4)',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+              ⚡ GPT-4o-mini 응답
+            </span>
+          )}
         </div>
       </form>
 
@@ -289,8 +407,35 @@ export default function SearchPanel() {
         </div>
       )}
 
+      {/* ── 로딩 ── */}
+      {loading && mode === 'ai' && (
+        <div style={{
+          padding: '30px 20px', textAlign: 'center',
+          color: 'rgba(255,255,255,0.4)',
+        }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10,
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 20, marginBottom: 10,
+            animation: 'pulse 1.5s ease-in-out infinite',
+          }}>🤖</div>
+          <p style={{ fontSize: '0.85rem' }}>AI가 문서를 분석하고 있습니다...</p>
+          <p style={{ fontSize: '0.72rem', marginTop: 4, opacity: 0.5 }}>벡터 검색 → 컨텍스트 생성 → GPT-4o-mini 답변</p>
+        </div>
+      )}
+
+      {/* ── AI 답변 ── */}
+      {aiAnswer && !loading && (
+        <AiAnswerBox
+          answer={aiAnswer.answer}
+          model={aiAnswer.model}
+          tokensUsed={aiAnswer.tokensUsed}
+        />
+      )}
+
       {/* ── 결과 없음 ── */}
-      {searched && !loading && results.length === 0 && !error && (
+      {searched && !loading && results.length === 0 && !error && !aiAnswer && (
         <div style={{
           textAlign: 'center', padding: '40px 20px',
           color: 'rgba(255,255,255,0.25)',
@@ -301,15 +446,17 @@ export default function SearchPanel() {
         </div>
       )}
 
-      {/* ── 결과 목록 ── */}
-      {results.length > 0 && (
+      {/* ── 결과 목록 (벡터 검색) 또는 출처 문서 (AI) ── */}
+      {results.length > 0 && !loading && (
         <div>
           <div style={{
             display: 'flex', alignItems: 'center', marginBottom: 10,
             padding: '0 4px',
           }}>
             <p style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)' }}>
-              <span style={{ color: '#818cf8', fontWeight: 700 }}>{results.length}개</span> 결과 — 유사도 높은 순
+              {mode === 'ai' ? '📚 ' : ''}
+              <span style={{ color: '#818cf8', fontWeight: 700 }}>{results.length}개</span>
+              {mode === 'ai' ? ' 참조 문서' : ' 결과'} — 유사도 높은 순
             </p>
             <button
               onClick={() => setExpandedId(null)}
