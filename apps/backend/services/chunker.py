@@ -27,7 +27,7 @@ recursive_splitter = RecursiveCharacterTextSplitter(
 )
 
 
-def semantic_chunk(markdown_text: str, doc_id: str, filename: str) -> List[dict]:
+def semantic_chunk(markdown_text: str, doc_id: str, filename: str, category: str = "default") -> List[dict]:
     """
     Markdown 텍스트를 의미 단위로 분할.
 
@@ -36,6 +36,7 @@ def semantic_chunk(markdown_text: str, doc_id: str, filename: str) -> List[dict]
             "text": str,
             "doc_id": str,
             "filename": str,
+            "category": str,
             "chunk_index": int,
             "headers": dict (h1, h2, h3 등),
             "chunk_id": str,
@@ -60,7 +61,7 @@ def semantic_chunk(markdown_text: str, doc_id: str, filename: str) -> List[dict]
         raw_chunks = recursive_splitter.split_text(markdown_text)
         for i, text in enumerate(raw_chunks):
             if text.strip():
-                chunks.append(_make_chunk(text, doc_id, filename, i, {}))
+                chunks.append(_make_chunk(text, doc_id, filename, i, {}, category))
         return chunks
 
     # 2단계: 각 헤더 섹션을 재귀적으로 추가 분할
@@ -73,25 +74,26 @@ def semantic_chunk(markdown_text: str, doc_id: str, filename: str) -> List[dict]
             continue
 
         if len(text) <= 1200:
-            chunks.append(_make_chunk(text, doc_id, filename, chunk_idx, metadata))
+            chunks.append(_make_chunk(text, doc_id, filename, chunk_idx, metadata, category))
             chunk_idx += 1
         else:
             # 너무 긴 섹션은 재귀 분할
             sub_texts = recursive_splitter.split_text(text)
             for sub_text in sub_texts:
                 if sub_text.strip():
-                    chunks.append(_make_chunk(sub_text, doc_id, filename, chunk_idx, metadata))
+                    chunks.append(_make_chunk(sub_text, doc_id, filename, chunk_idx, metadata, category))
                     chunk_idx += 1
 
     return chunks
 
 
-def _make_chunk(text: str, doc_id: str, filename: str, idx: int, headers: dict) -> dict:
+def _make_chunk(text: str, doc_id: str, filename: str, idx: int, headers: dict, category: str) -> dict:
     chunk_id = f"{doc_id}_chunk_{idx:04d}"
     return {
         "chunk_id": chunk_id,
         "doc_id": doc_id,
         "filename": filename,
+        "category": category,
         "chunk_index": idx,
         "text": text,
         "headers": headers,

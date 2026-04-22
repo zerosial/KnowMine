@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 
 from models.schemas import (
@@ -38,6 +38,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    category: str = Form("default"),
 ):
     """파일 업로드 및 파이프라인 시작"""
     filename = file.filename or "unknown"
@@ -61,6 +62,7 @@ async def upload_file(
         filename=filename,
         file_type=file_type,
         status=ProcessingStatus.PENDING,
+        category=category,
         uploaded_at=datetime.now().isoformat(),
         file_size=file_size,
     )
@@ -72,6 +74,7 @@ async def upload_file(
         doc_id=doc_id,
         file_bytes=file_bytes,
         filename=filename,
+        category=category,
     )
 
     return UploadResponse(
@@ -79,10 +82,11 @@ async def upload_file(
         filename=filename,
         message="파일이 업로드되었습니다. 처리가 시작됩니다.",
         status=ProcessingStatus.PENDING,
+        category=category,
     )
 
 
-async def process_document_pipeline(doc_id: str, file_bytes: bytes, filename: str):
+def process_document_pipeline(doc_id: str, file_bytes: bytes, filename: str, category: str):
     """
     전체 문서 처리 파이프라인 (백그라운드 태스크)
     1. 파싱 (Excel/PPT/PDF → Markdown)
@@ -100,8 +104,8 @@ async def process_document_pipeline(doc_id: str, file_bytes: bytes, filename: st
         print(f"[{doc_id}] ✅ Parsed ({file_type}): {len(markdown_content)} chars")
 
         # 2단계: 청킹
-        chunks = semantic_chunk(markdown_content, doc_id, filename)
-        print(f"[{doc_id}] ✅ Chunked: {len(chunks)} chunks")
+        chunks = semantic_chunk(markdown_content, doc_id, filename, category)
+        print(f"[{doc_id}] ✅ Chunked: {len(chunks)} chunks in {category}")
 
         if not chunks:
             raise ValueError("파싱된 청크가 없습니다. 파일 내용을 확인해주세요.")

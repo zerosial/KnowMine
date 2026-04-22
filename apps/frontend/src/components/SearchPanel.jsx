@@ -231,19 +231,19 @@ function AiAnswerBox({ answer, model, tokensUsed }) {
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
           components={{
-            h1: ({node, ...props}) => <h1 style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#818cf8', marginTop: 16, marginBottom: 8}} {...props} />,
-            h2: ({node, ...props}) => <h2 style={{fontSize: '1.1rem', fontWeight: 'bold', color: '#c4b5fd', marginTop: 14, marginBottom: 6}} {...props} />,
-            h3: ({node, ...props}) => <h3 style={{fontSize: '1.0rem', fontWeight: 'bold', color: '#ddd6fe', marginTop: 12, marginBottom: 4}} {...props} />,
-            p: ({node, ...props}) => <p style={{marginBottom: 10}} {...props} />,
-            ul: ({node, ...props}) => <ul style={{listStyleType: 'disc', paddingLeft: 20, marginBottom: 10}} {...props} />,
-            ol: ({node, ...props}) => <ol style={{listStyleType: 'decimal', paddingLeft: 20, marginBottom: 10}} {...props} />,
-            li: ({node, ...props}) => <li style={{marginBottom: 4}} {...props} />,
-            a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" style={{color: '#60a5fa', textDecoration: 'underline'}} {...props} />,
-            strong: ({node, ...props}) => <strong style={{color: '#fff', fontWeight: 800}} {...props} />,
-            table: ({node, ...props}) => <div style={{overflowX: 'auto', marginBottom: 10}}><table style={{width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem'}} {...props} /></div>,
-            th: ({node, ...props}) => <th style={{border: '1px solid rgba(255,255,255,0.1)', padding: '8px 12px', background: 'rgba(99,102,241,0.1)'}} {...props} />,
-            td: ({node, ...props}) => <td style={{border: '1px solid rgba(255,255,255,0.1)', padding: '8px 12px'}} {...props} />,
-            blockquote: ({node, ...props}) => <blockquote style={{borderLeft: '3px solid #818cf8', paddingLeft: 10, color: 'rgba(255,255,255,0.6)', margin: '10px 0', background: 'rgba(0,0,0,0.1)', padding: '8px 12px'}} {...props} />,
+            h1: ({...props}) => <h1 style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#818cf8', marginTop: 16, marginBottom: 8}} {...props} />,
+            h2: ({...props}) => <h2 style={{fontSize: '1.1rem', fontWeight: 'bold', color: '#c4b5fd', marginTop: 14, marginBottom: 6}} {...props} />,
+            h3: ({...props}) => <h3 style={{fontSize: '1.0rem', fontWeight: 'bold', color: '#ddd6fe', marginTop: 12, marginBottom: 4}} {...props} />,
+            p: ({...props}) => <p style={{marginBottom: 10}} {...props} />,
+            ul: ({...props}) => <ul style={{listStyleType: 'disc', paddingLeft: 20, marginBottom: 10}} {...props} />,
+            ol: ({...props}) => <ol style={{listStyleType: 'decimal', paddingLeft: 20, marginBottom: 10}} {...props} />,
+            li: ({...props}) => <li style={{marginBottom: 4}} {...props} />,
+            a: ({...props}) => <a target="_blank" rel="noopener noreferrer" style={{color: '#60a5fa', textDecoration: 'underline'}} {...props} />,
+            strong: ({...props}) => <strong style={{color: '#fff', fontWeight: 800}} {...props} />,
+            table: ({...props}) => <div style={{overflowX: 'auto', marginBottom: 10}}><table style={{width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem'}} {...props} /></div>,
+            th: ({...props}) => <th style={{border: '1px solid rgba(255,255,255,0.1)', padding: '8px 12px', background: 'rgba(99,102,241,0.1)'}} {...props} />,
+            td: ({...props}) => <td style={{border: '1px solid rgba(255,255,255,0.1)', padding: '8px 12px'}} {...props} />,
+            blockquote: ({...props}) => <blockquote style={{borderLeft: '3px solid #818cf8', paddingLeft: 10, color: 'rgba(255,255,255,0.6)', margin: '10px 0', background: 'rgba(0,0,0,0.1)', padding: '8px 12px'}} {...props} />,
           }}
         >
           {answer}
@@ -256,7 +256,7 @@ function AiAnswerBox({ answer, model, tokensUsed }) {
 // ─────────────────────────────────────────────
 // 메인 SearchPanel
 // ─────────────────────────────────────────────
-export default function SearchPanel() {
+export default function SearchPanel({ activeCategory }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -281,7 +281,7 @@ export default function SearchPanel() {
     try {
       if (mode === 'ai') {
         // AI 질문 모드
-        const data = await askQuestion({ query, topK })
+        const data = await askQuestion({ query, topK, category: activeCategory })
         setAiAnswer({
           answer: data.answer,
           model: data.model,
@@ -291,7 +291,7 @@ export default function SearchPanel() {
         setSearched(true)
       } else {
         // 벡터 검색 모드
-        const data = await searchDocuments({ query, topK })
+        const data = await searchDocuments({ query, topK, category: activeCategory })
         setResults(data)
         setSearched(true)
         if (data.length > 0) setExpandedId(data[0].chunk_id)
@@ -342,6 +342,16 @@ export default function SearchPanel() {
           </button>
         ))}
       </div>
+
+      {activeCategory && (
+        <div style={{
+          marginBottom: 12, padding: '6px 12px', background: 'rgba(99,102,241,0.1)', 
+          borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontSize: '0.75rem', color: '#c4b5fd', border: '1px solid rgba(99,102,241,0.2)'
+        }}>
+          <span>📌</span> <strong>[{activeCategory === 'default' ? '기본 (Default)' : activeCategory}]</strong> 지식창고 안에서 찾고 있습니다.
+        </div>
+      )}
 
       {/* ── 검색 입력 ── */}
       <form onSubmit={handleSearch} style={{ marginBottom: 16 }}>

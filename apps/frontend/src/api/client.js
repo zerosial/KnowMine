@@ -14,9 +14,10 @@ async function handleResponse(res) {
 }
 
 /** 파일 업로드 */
-export async function uploadFile(file) {
+export async function uploadFile(file, category = "default") {
   const formData = new FormData()
   formData.append('file', file)
+  formData.append('category', category)
 
   const res = await fetch(`${BASE_URL}/upload`, {
     method: 'POST',
@@ -26,8 +27,9 @@ export async function uploadFile(file) {
 }
 
 /** 전체 문서 목록 조회 */
-export async function fetchDocuments() {
-  const res = await fetch(`${BASE_URL}/documents`)
+export async function fetchDocuments(category = null) {
+  const url = category ? `${BASE_URL}/documents?category=${encodeURIComponent(category)}` : `${BASE_URL}/documents`;
+  const res = await fetch(url)
   return handleResponse(res)
 }
 
@@ -52,21 +54,21 @@ export async function deleteDocument(docId) {
 }
 
 /** 유사도 검색 */
-export async function searchDocuments({ query, topK = 5, docId = null }) {
+export async function searchDocuments({ query, topK = 5, docId = null, category = null }) {
   const res = await fetch(`${BASE_URL}/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, top_k: topK, doc_id: docId }),
+    body: JSON.stringify({ query, top_k: topK, doc_id: docId, category }),
   })
   return handleResponse(res)
 }
 
 /** AI 질문 답변 (RAG) */
-export async function askQuestion({ query, topK = 5, docId = null }) {
+export async function askQuestion({ query, topK = 5, docId = null, category = null }) {
   const res = await fetch(`${BASE_URL}/ask`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, top_k: topK, doc_id: docId }),
+    body: JSON.stringify({ query, top_k: topK, doc_id: docId, category }),
   })
   return handleResponse(res)
 }

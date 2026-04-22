@@ -110,13 +110,17 @@ def get_document_meta(doc_id: str) -> Optional[DocumentMeta]:
         return None
 
 
-def list_documents() -> List[DocumentMeta]:
-    """전체 문서 목록 조회"""
+def list_documents(category: Optional[str] = None) -> List[DocumentMeta]:
+    """전체 문서 목록 조회 (옵션: 카테고리 필터링)"""
     col = get_meta_collection()
     try:
         result = col.get(include=["metadatas", "documents"])
         docs = []
         for m in result["metadatas"]:
+            # 카테고리 필터링
+            if category and m.get("category", "default") != category:
+                continue
+            
             try:
                 docs.append(DocumentMeta(
                     doc_id=m["doc_id"],
@@ -128,6 +132,7 @@ def list_documents() -> List[DocumentMeta]:
                     processed_at=m.get("processed_at"),
                     error_message=m.get("error_message"),
                     file_size=int(m.get("file_size", 0)),
+                    category=m.get("category", "default"),
                 ))
             except Exception:
                 continue
@@ -176,6 +181,7 @@ def save_chunks(chunks: List[dict], embeddings: List[List[float]]):
             "chunk_index": str(c["chunk_index"]),
             "char_count": str(c["char_count"]),
             "headers": json.dumps(c.get("headers", {}), ensure_ascii=False),
+            "category": c.get("category", "default"),
         }
         for c in chunks
     ]
@@ -247,7 +253,7 @@ def get_stats() -> StatsResponse:
 # 유사도 검색
 # ─────────────────────────────────────────────
 
-def search_similar(query_embedding: List[float], top_k: int = 5, doc_id: Optional[str] = None) -> List[dict]:
+def search_similar(query_embedding: List[float], top_k: int = 5, doc_id: Optional[str] = None, category: Optional[str] = None) -> List[dict]:
     """유사 청크 검색"""
     col = get_docs_collection()
     
@@ -255,7 +261,18 @@ def search_similar(query_embedding: List[float], top_k: int = 5, doc_id: Optiona
     if count == 0:
         return []
 
-    where = {"doc_id": doc_id} if doc_id else None
+    where_clauses = []
+    if doc_id:
+        where_clauses.append({"doc_id": doc_id})
+    if category:
+        where_clauses.append({"category": category})
+
+    where = None
+    if len(where_clauses) == 1:
+        where = where_clauses[0]
+    elif len(where_clauses) > 1:
+        where = {"$and": where_clauses}
+
     kwargs = {
         "query_embeddings": [query_embedding],
         "include": ["documents", "metadatas", "distances"],

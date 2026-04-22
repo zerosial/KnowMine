@@ -18,9 +18,9 @@ router = APIRouter()
 
 
 @router.get("/documents", response_model=List[DocumentResponse])
-async def list_documents():
+async def list_documents(category: Optional[str] = None):
     """전체 문서 목록 반환"""
-    docs = vector_store.list_documents()
+    docs = vector_store.list_documents(category=category)
     return [
         DocumentResponse(
             doc_id=d.doc_id,
@@ -32,6 +32,7 @@ async def list_documents():
             processed_at=d.processed_at,
             error_message=d.error_message,
             file_size=d.file_size,
+            category=d.category,
         )
         for d in docs
     ]
@@ -54,6 +55,7 @@ async def get_document(doc_id: str):
         processed_at=meta.processed_at,
         error_message=meta.error_message,
         file_size=meta.file_size,
+        category=meta.category,
     )
 
 
@@ -78,6 +80,7 @@ class SearchRequest(BaseModel):
     query: str
     top_k: int = 5
     doc_id: Optional[str] = None
+    category: Optional[str] = None
 
 
 class SearchResult(BaseModel):
@@ -102,6 +105,7 @@ async def search_documents(req: SearchRequest):
         query_embedding=query_embedding,
         top_k=req.top_k,
         doc_id=req.doc_id,
+        category=req.category,
     )
 
     return [
@@ -124,6 +128,7 @@ class AskRequest(BaseModel):
     query: str
     top_k: int = 5
     doc_id: Optional[str] = None
+    category: Optional[str] = None
 
 
 class AskResponse(BaseModel):
@@ -145,6 +150,7 @@ async def ask_question(req: AskRequest):
         query_embedding=query_embedding,
         top_k=req.top_k,
         doc_id=req.doc_id,
+        category=req.category,
     )
 
     if not results:

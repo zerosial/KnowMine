@@ -20,6 +20,10 @@ export default function Dashboard() {
   const [docsLoading, setDocsLoading] = useState(true)
   const [statsLoading, setStatsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('documents') // documents | search
+  const [activeCategory, setActiveCategory] = useState(null) // null = 전체
+  const [customCategories, setCustomCategories] = useState(() => JSON.parse(localStorage.getItem('knowmine_categories') || '[]'))
+  const [newCatName, setNewCatName] = useState('')
+  const [isAddingCat, setIsAddingCat] = useState(false)
   const pollRef = useRef(null)
 
   const addLog = useCallback((message, type = 'info') => {
@@ -29,7 +33,10 @@ export default function Dashboard() {
   // 데이터 갱신
   const refresh = useCallback(async () => {
     try {
-      const [docsData, statsData] = await Promise.all([fetchDocuments(), fetchStats()])
+      const [docsData, statsData] = await Promise.all([
+        fetchDocuments(), // 프론트 화면에서 activeCategory로 로컬 필터링을 하기 위해 전체 문서를 받아옵니다
+        fetchStats()
+      ])
       setDocs(docsData)
       setStats(statsData)
     } catch (err) {
@@ -65,11 +72,11 @@ export default function Dashboard() {
     if (uploading) return
     setUploading(true)
 
-    for (const file of files) {
-      addLog(`업로드 중: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`, 'upload')
-      try {
-        const res = await uploadFile(file)
-        addLog(`요청 완료: ${file.name} → ID: ${res.doc_id.slice(0, 8)}...`, 'success')
+      for (const file of files) {
+        addLog(`업로드 중: ${file.name} (${(file.size / 1024).toFixed(1)} KB) -> [${activeCategory || 'default'}]`, 'upload')
+        try {
+          const res = await uploadFile(file, activeCategory || 'default')
+          addLog(`요청 완료: ${file.name} → ID: ${res.doc_id.slice(0, 8)}...`, 'success')
       } catch (err) {
         addLog(`업로드 실패: ${file.name} — ${err.message}`, 'error')
       }
@@ -80,7 +87,7 @@ export default function Dashboard() {
 
     // 업로드 후 즉시 갱신 + 폴링 시작
     await refresh()
-  }, [uploading, addLog, refresh])
+  }, [uploading, addLog, refresh, activeCategory])
 
   const handleDeleted = useCallback((docId) => {
     setDocs(prev => prev.filter(d => d.doc_id !== docId))
@@ -88,11 +95,28 @@ export default function Dashboard() {
     refresh()
   }, [addLog, refresh])
 
+  // 현재 카테고리에 맞는 문서만 필터링
+  const filteredDocs = activeCategory ? docs.filter(d => (d.category || 'default') === activeCategory) : docs;
+
   // 문서를 상태별로 정렬 (처리중 먼저)
-  const sortedDocs = [...docs].sort((a, b) => {
+  const sortedDocs = [...filteredDocs].sort((a, b) => {
     const order = { processing: 0, pending: 1, completed: 2, failed: 3 }
     return (order[a.status] ?? 9) - (order[b.status] ?? 9)
   })
+
+  // 유니크 카테고리
+  const uniqueCategories = Array.from(new Set(['default', ...customCategories, ...docs.map(d => d.category || 'default')]))
+
+  const handleAddCategory = () => {
+    if (newCatName.trim() && !uniqueCategories.includes(newCatName.trim())) {
+      const newCats = [...customCategories, newCatName.trim()]
+      setCustomCategories(newCats)
+      localStorage.setItem('knowmine_categories', JSON.stringify(newCats))
+      setActiveCategory(newCatName.trim())
+    }
+    setNewCatName('')
+    setIsAddingCat(false)
+  }
 
   return (
     <div style={{ minHeight: '100vh', position: 'relative', overflow: 'hidden' }}>
@@ -166,6 +190,68 @@ export default function Dashboard() {
           </button>
         </header>
 
+        {/* ── 카테고리(탭) UI ── */}
+        <section style={{ marginBottom: 24, display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8 }}>
+          <button
+            onClick={() => setActiveCategory(null)}
+            style={{
+              padding: '8px 16px', borderRadius: 20, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
+              background: activeCategory === null ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.02)',
+              color: activeCategory === null ? '#c4b5fd' : 'rgba(255,255,255,0.6)',
+              fontWeight: activeCategory === null ? 700 : 500, transition: 'all 0.2s', whiteSpace: 'nowrap'
+            }}
+          >
+            전체 보기
+          </button>
+          
+          {uniqueCategories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              style={{
+                padding: '8px 16px', borderRadius: 20, cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)',
+                background: activeCategory === cat ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.02)',
+                color: activeCategory === cat ? '#c4b5fd' : 'rgba(255,255,255,0.6)',
+                fontWeight: activeCategory === cat ? 700 : 500, transition: 'all 0.2s', whiteSpace: 'nowrap'
+              }}
+            >
+              {cat === 'default' ? '기본 (Default)' : cat}
+            </button>
+          ))}
+
+          {isAddingCat ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <input 
+                type="text" 
+                value={newCatName}
+                onChange={e => setNewCatName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+                onBlur={() => { if(!newCatName) setIsAddingCat(false) }}
+                placeholder="카테고리명..."
+                autoFocus
+                style={{
+                  padding: '6px 12px', borderRadius: 16, border: '1px solid rgba(99,102,241,0.5)', 
+                  background: 'rgba(0,0,0,0.2)', color: '#fff', fontSize: '0.85rem', width: 120
+                }}
+              />
+              <button 
+                onClick={handleAddCategory}
+                style={{ padding: '6px 10px', borderRadius: 16, border: 'none', background: '#6366f1', color: '#fff', cursor: 'pointer' }}
+              >추가</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsAddingCat(true)}
+              style={{
+                padding: '8px 16px', borderRadius: 20, cursor: 'pointer', border: '1px dashed rgba(255,255,255,0.3)',
+                background: 'transparent', color: 'rgba(255,255,255,0.6)', fontWeight: 500, transition: 'all 0.2s', whiteSpace: 'nowrap'
+              }}
+            >
+              + 탭 추가
+            </button>
+          )}
+        </section>
+
         {/* ── 통계 패널 ── */}
         <section style={{ marginBottom: 24 }}>
           <StatsPanel stats={stats} loading={statsLoading} />
@@ -179,9 +265,9 @@ export default function Dashboard() {
             {/* 업로드 */}
             <div className="glass-card" style={{ padding: '20px' }}>
               <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e2e8f0', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>📤</span> 문서 업로드
+                <span>📤</span> 문서 업로드 {activeCategory && <span style={{fontSize:'0.75rem', fontWeight:'normal', background:'rgba(139,92,246,0.2)', padding:'2px 8px', borderRadius:10, color:'#c4b5fd'}}>[{activeCategory}] 대상</span>}
               </h2>
-              <UploadZone onUpload={handleUpload} uploading={uploading} />
+              <UploadZone onUpload={handleUpload} uploading={uploading} disabled={!activeCategory && false /* 전체상태에서도 default로 업로드되게 처리 */} />
             </div>
 
             {/* 처리 로그 */}
@@ -205,7 +291,7 @@ export default function Dashboard() {
             {/* 탭 헤더 */}
             <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 4 }}>
               {[
-                { key: 'documents', label: '📁 문서 목록', count: docs.length },
+                { key: 'documents', label: '📁 문서 목록', count: filteredDocs.length },
                 { key: 'search',    label: '🔍 AI 검색',  count: null },
               ].map(tab => (
                 <button
@@ -275,7 +361,7 @@ export default function Dashboard() {
 
             {/* 탭 콘텐츠: AI 검색 */}
             {activeTab === 'search' && (
-              <SearchPanel />
+              <SearchPanel activeCategory={activeCategory} />
             )}
           </div>
         </div>
