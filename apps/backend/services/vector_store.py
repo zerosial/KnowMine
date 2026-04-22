@@ -250,17 +250,34 @@ def get_stats() -> StatsResponse:
 def search_similar(query_embedding: List[float], top_k: int = 5, doc_id: Optional[str] = None) -> List[dict]:
     """유사 청크 검색"""
     col = get_docs_collection()
+    
+    count = col.count()
+    if count == 0:
+        return []
 
     where = {"doc_id": doc_id} if doc_id else None
     kwargs = {
         "query_embeddings": [query_embedding],
-        "n_results": min(top_k, col.count() or 1),
         "include": ["documents", "metadatas", "distances"],
     }
     if where:
         kwargs["where"] = where
 
-    results = col.query(**kwargs)
+    k = min(top_k, count)
+    results = None
+    while k > 0:
+        try:
+            kwargs["n_results"] = k
+            results = col.query(**kwargs)
+            break
+        except RuntimeError as e:
+            if "contigious 2D array" in str(e) or "ef or M is too small" in str(e):
+                k -= 1
+            else:
+                raise e
+                
+    if not results or k == 0:
+        return []
 
     output = []
     for i in range(len(results["ids"][0])):

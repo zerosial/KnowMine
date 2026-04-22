@@ -1,40 +1,59 @@
 """
-OpenAI API 서비스 — RAG 답변 생성 + 청크 품질 정제
+Gemini API 서비스 — RAG 답변 생성 + 청크 품질 정제 (Reload)
 
-- gpt-4o-mini 사용 (가성비 최적)
-- 비용 최적화: max_tokens 제한, 청크 정제는 1회만 실행
+- gemini-2.5-flash 사용 (빠르고 저렴하며 컨텍스트 윈도우가 큼)
 - 장애 격리: API 실패 시 graceful fallback
 """
 from __future__ import annotations
 import os
 from typing import Optional
 from dotenv import load_dotenv
-from openai import OpenAI
+from google import genai
+from google.genai import types
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
 # .env 로드
 load_dotenv()
 
-_client: Optional[OpenAI] = None
+_client: Optional[genai.Client] = None
 
 
-def get_client() -> OpenAI:
-    """OpenAI 클라이언트 싱글턴"""
+def get_client() -> genai.Client:
+    """Gemini 클라이언트 싱글턴"""
     global _client
     if _client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            raise RuntimeError("OPENAI_API_KEY가 .env에 설정되지 않았습니다.")
-        _client = OpenAI(api_key=api_key)
-        print(f"✅ OpenAI client initialized (model: {get_model()})")
+            raise RuntimeError("GOOGLE_API_KEY가 .env에 설정되지 않았습니다.")
+        _client = genai.Client(api_key=api_key)
+        print(f"✅ Gemini client initialized (model: {get_model()})")
     return _client
 
 
 def get_model() -> str:
-    return os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    return os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 
 def is_enrichment_enabled() -> bool:
     return os.getenv("ENRICH_CHUNKS", "false").lower() == "true"
+
+
+def is_retryable_error(e: BaseException) -> bool:
+    err_str = str(e)
+    return "503" in err_str or "UNAVAILABLE" in err_str or "429" in err_str or "Too Many Requests" in err_str
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception(is_retryable_error),
+    reraise=True
+)
+def _call_gemini_with_retry(client, model, contents, config):
+    return client.models.generate_content(
+        model=model,
+        contents=contents,
+        config=config
+    )
 
 
 # ─────────────────────────────────────────────
@@ -66,7 +85,7 @@ def generate_answer(query: str, context_chunks: list[dict]) -> dict:
     client = get_client()
     model = get_model()
 
-    # 컨텍스트 구성 (토큰 절약을 위해 상위 청크만, 총 4000자 제한)
+    # 컨텍스트 구성 (총 10000자 제한)
     context_parts = []
     total_chars = 0
     for i, chunk in enumerate(context_chunks):
@@ -76,7 +95,7 @@ def generate_answer(query: str, context_chunks: list[dict]) -> dict:
 
         entry = f"[참조 {i+1}] 📄 {filename} (유사도: {score:.1%})\n{chunk_text}"
         
-        if total_chars + len(entry) > 4000:
+        if total_chars + len(entry) > 10000:
             break
         context_parts.append(entry)
         total_chars += len(entry)
@@ -90,18 +109,19 @@ def generate_answer(query: str, context_chunks: list[dict]) -> dict:
 {query}"""
 
     try:
-        response = client.chat.completions.create(
+        response = _call_gemini_with_retry(
+            client=client,
             model=model,
-            messages=[
-                {"role": "system", "content": RAG_SYSTEM_PROMPT},
-                {"role": "user", "content": user_message},
-            ],
-            max_tokens=800,
-            temperature=0.3,  # 사실 기반 답변은 낮은 temperature
+            contents=user_message,
+            config=types.GenerateContentConfig(
+                system_instruction=RAG_SYSTEM_PROMPT,
+                temperature=0.3,
+                max_output_tokens=4096,
+            )
         )
 
-        answer = response.choices[0].message.content or ""
-        tokens_used = response.usage.total_tokens if response.usage else 0
+        answer = response.text or ""
+        tokens_used = response.usage_metadata.total_token_count if response.usage_metadata else 0
 
         return {
             "answer": answer,
@@ -148,17 +168,18 @@ def enrich_chunk(chunk_text: str, filename: str) -> str:
         client = get_client()
         model = get_model()
 
-        response = client.chat.completions.create(
+        response = _call_gemini_with_retry(
+            client=client,
             model=model,
-            messages=[
-                {"role": "system", "content": ENRICH_SYSTEM_PROMPT},
-                {"role": "user", "content": f"[파일명: {filename}]\n\n{chunk_text}"},
-            ],
-            max_tokens=300,
-            temperature=0.2,
+            contents=f"[파일명: {filename}]\n\n{chunk_text}",
+            config=types.GenerateContentConfig(
+                system_instruction=ENRICH_SYSTEM_PROMPT,
+                temperature=0.2,
+                max_output_tokens=300,
+            )
         )
 
-        enriched = response.choices[0].message.content
+        enriched = response.text
         if enriched and len(enriched.strip()) > len(chunk_text.strip()) * 0.3:
             return enriched.strip()
         else:

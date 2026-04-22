@@ -194,7 +194,8 @@ def _pptx_table_to_markdown(table) -> str:
 def parse_pdf(file_bytes: bytes, filename: str) -> str:
     """
     PDF 파일을 Markdown으로 변환.
-    텍스트 블록의 폰트 크기 기반으로 제목 계층 추론.
+    문서의 기본 폰트 크기(Base Size)를 동적으로 계산하여,
+    폰트가 크거나 굵은(Bold) 텍스트를 범용적으로 제목(Heading)으로 인식합니다.
     """
     md_sections = [f"# 📄 파일: {filename}\n"]
 
@@ -203,11 +204,26 @@ def parse_pdf(file_bytes: bytes, filename: str) -> str:
         total_pages = len(doc)
         md_sections.append(f"> 총 페이지: {total_pages}페이지\n")
 
+        # 1. 문서 전체를 스캔하여 기본 폰트 크기(Base Size) 도출
+        font_counts = {}
+        for page in doc:
+            for block in page.get_text("dict").get("blocks", []):
+                if block.get("type") == 0:
+                    for line in block.get("lines", []):
+                        for span in line.get("spans", []):
+                            sz = round(span.get("size", 12))
+                            txt = span.get("text", "").strip()
+                            if txt:
+                                font_counts[sz] = font_counts.get(sz, 0) + len(txt)
+        
+        # 가장 많이 쓰인 글자 크기를 본문(Body) 크기로 간주
+        base_size = max(font_counts.items(), key=lambda x: x[1])[0] if font_counts else 12
+
         for page_num, page in enumerate(doc, start=1):
             page_md = [f"\n## 페이지 {page_num}"]
 
-            # 텍스트 블록 추출 (딕셔너리 형태로 폰트 크기 포함)
-            blocks = page.get_text("dict")["blocks"]
+            # 텍스트 블록 추출
+            blocks = page.get_text("dict").get("blocks", [])
             for block in blocks:
                 if block.get("type") != 0:  # 0 = text block
                     continue
@@ -220,10 +236,26 @@ def parse_pdf(file_bytes: bytes, filename: str) -> str:
                     if not text:
                         continue
 
-                    # 폰트 크기로 heading 레벨 결정 (너무 잦은 헤더 분할을 막기 위해 20pt 이상만 제목으로 취급)
-                    font_size = spans[0].get("size", 12)
-                    if font_size >= 20:
-                        page_md.append(f"\n### {text}")
+                    # 범용 제목 인식 로직 (글자 크기, 볼드체 여부, 텍스트 길이 활용)
+                    first_span = spans[0]
+                    font_size = first_span.get("size", base_size)
+                    font_name = first_span.get("font", "").lower()
+                    flags = first_span.get("flags", 0)
+                    
+                    is_bold = ("bold" in font_name) or (flags & 16 != 0)
+                    is_heading = False
+                    
+                    # 텍스트가 너무 길지 않으면서(제목의 특성)
+                    if len(text) < 100:
+                        if font_size >= base_size + 1.5:  # 본문보다 확연히 큼
+                            is_heading = True
+                        elif is_bold and font_size > base_size: # 본문보다 살짝 크고 볼드체
+                            is_heading = True
+                        elif is_bold and len(text) < 60: # 폰트 크기는 같지만 짧은 볼드체 강조 문구
+                            is_heading = True
+                    
+                    if is_heading:
+                        page_md.append(f"\n### {text}\n")
                     else:
                         page_md.append(text)
 

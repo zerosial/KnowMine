@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { searchDocuments, askQuestion } from '../api/client'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 // ─────────────────────────────────────────────
 // 청크 텍스트에서 마크다운 헤더(##, ###)를 파싱해
@@ -216,15 +218,36 @@ function AiAnswerBox({ answer, model, tokensUsed }) {
       </div>
 
       {/* 답변 본문 */}
-      <div style={{
-        fontSize: '0.85rem',
-        color: 'rgba(255,255,255,0.85)',
-        lineHeight: 1.9,
-        whiteSpace: 'pre-wrap',
-        wordBreak: 'break-word',
-        fontFamily: 'var(--font-body)',
-      }}>
-        {answer}
+      <div 
+        className="ai-markdown"
+        style={{
+          fontSize: '0.85rem',
+          color: 'rgba(255,255,255,0.85)',
+          lineHeight: 1.9,
+          wordBreak: 'break-word',
+          fontFamily: 'var(--font-body)',
+        }}
+      >
+        <ReactMarkdown 
+          remarkPlugins={[remarkGfm]}
+          components={{
+            h1: ({node, ...props}) => <h1 style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#818cf8', marginTop: 16, marginBottom: 8}} {...props} />,
+            h2: ({node, ...props}) => <h2 style={{fontSize: '1.1rem', fontWeight: 'bold', color: '#c4b5fd', marginTop: 14, marginBottom: 6}} {...props} />,
+            h3: ({node, ...props}) => <h3 style={{fontSize: '1.0rem', fontWeight: 'bold', color: '#ddd6fe', marginTop: 12, marginBottom: 4}} {...props} />,
+            p: ({node, ...props}) => <p style={{marginBottom: 10}} {...props} />,
+            ul: ({node, ...props}) => <ul style={{listStyleType: 'disc', paddingLeft: 20, marginBottom: 10}} {...props} />,
+            ol: ({node, ...props}) => <ol style={{listStyleType: 'decimal', paddingLeft: 20, marginBottom: 10}} {...props} />,
+            li: ({node, ...props}) => <li style={{marginBottom: 4}} {...props} />,
+            a: ({node, ...props}) => <a target="_blank" rel="noopener noreferrer" style={{color: '#60a5fa', textDecoration: 'underline'}} {...props} />,
+            strong: ({node, ...props}) => <strong style={{color: '#fff', fontWeight: 800}} {...props} />,
+            table: ({node, ...props}) => <div style={{overflowX: 'auto', marginBottom: 10}}><table style={{width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem'}} {...props} /></div>,
+            th: ({node, ...props}) => <th style={{border: '1px solid rgba(255,255,255,0.1)', padding: '8px 12px', background: 'rgba(99,102,241,0.1)'}} {...props} />,
+            td: ({node, ...props}) => <td style={{border: '1px solid rgba(255,255,255,0.1)', padding: '8px 12px'}} {...props} />,
+            blockquote: ({node, ...props}) => <blockquote style={{borderLeft: '3px solid #818cf8', paddingLeft: 10, color: 'rgba(255,255,255,0.6)', margin: '10px 0', background: 'rgba(0,0,0,0.1)', padding: '8px 12px'}} {...props} />,
+          }}
+        >
+          {answer}
+        </ReactMarkdown>
       </div>
     </div>
   )
