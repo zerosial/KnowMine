@@ -13,7 +13,7 @@ const ACCEPT_TYPES = [
   '.pdf',
 ].join(',')
 
-export default function UploadZone({ onUpload, uploading }) {
+export default function UploadZone({ onUpload, uploading, categoryName }) {
   const [dragOver, setDragOver] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState([])
 
@@ -84,7 +84,7 @@ export default function UploadZone({ onUpload, uploading }) {
 
       <p style={{ fontWeight: 600, fontSize: '1rem', color: '#e2e8f0', marginBottom: 6 }}>
         {uploading
-          ? '처리 중...'
+          ? <span><span style={{color: '#c4b5fd'}}>[{categoryName}]</span> 에 탑재 중...</span>
           : dragOver
           ? '여기에 놓으세요!'
           : '파일을 드래그하거나 클릭하여 업로드'}

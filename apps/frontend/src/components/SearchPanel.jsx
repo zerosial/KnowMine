@@ -423,7 +423,7 @@ export default function SearchPanel({ activeCategory }) {
               color: 'rgba(99,102,241,0.4)',
               display: 'flex', alignItems: 'center', gap: 4,
             }}>
-              ⚡ GPT-4o-mini 응답
+              ⚡ Gemini 응답
             </span>
           )}
         </div>
@@ -454,7 +454,7 @@ export default function SearchPanel({ activeCategory }) {
             animation: 'pulse 1.5s ease-in-out infinite',
           }}>🤖</div>
           <p style={{ fontSize: '0.85rem' }}>AI가 문서를 분석하고 있습니다...</p>
-          <p style={{ fontSize: '0.72rem', marginTop: 4, opacity: 0.5 }}>벡터 검색 → 컨텍스트 생성 → GPT-4o-mini 답변</p>
+          <p style={{ fontSize: '0.72rem', marginTop: 4, opacity: 0.5 }}>벡터 검색 → 컨텍스트 생성 → Gemini 답변</p>
         </div>
       )}
 

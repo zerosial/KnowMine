@@ -267,7 +267,7 @@ export default function Dashboard() {
               <h2 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#e2e8f0', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span>📤</span> 문서 업로드 {activeCategory && <span style={{fontSize:'0.75rem', fontWeight:'normal', background:'rgba(139,92,246,0.2)', padding:'2px 8px', borderRadius:10, color:'#c4b5fd'}}>[{activeCategory}] 대상</span>}
               </h2>
-              <UploadZone onUpload={handleUpload} uploading={uploading} disabled={!activeCategory && false /* 전체상태에서도 default로 업로드되게 처리 */} />
+              <UploadZone onUpload={handleUpload} uploading={uploading} categoryName={activeCategory || '기본 (Default)'} disabled={!activeCategory && false /* 전체상태에서도 default로 업로드되게 처리 */} />
             </div>
 
             {/* 처리 로그 */}

@@ -74,9 +74,9 @@ def save_document_meta(meta: DocumentMeta):
     col = get_meta_collection()
     meta_dict = meta.model_dump()
 
-    # ChromaDB는 중첩 dict를 지원하지 않아 JSON 직렬화
+    # ChromaDB는 중첩 dict와 None을 지원하지 않아 값 변환 및 None 필터링
     flat_meta = {k: str(v) if not isinstance(v, str) else v
-                 for k, v in meta_dict.items()}
+                 for k, v in meta_dict.items() if v is not None and v != "None"}
 
     # upsert: 이미 있으면 업데이트
     col.upsert(
@@ -102,9 +102,10 @@ def get_document_meta(doc_id: str) -> Optional[DocumentMeta]:
             status=m["status"],
             total_chunks=int(m.get("total_chunks", 0)),
             uploaded_at=m["uploaded_at"],
-            processed_at=m.get("processed_at"),
-            error_message=m.get("error_message"),
+            processed_at=m.get("processed_at") if m.get("processed_at") != "None" else None,
+            error_message=m.get("error_message") if m.get("error_message") != "None" else None,
             file_size=int(m.get("file_size", 0)),
+            category=m.get("category", "default"),
         )
     except Exception:
         return None
@@ -129,8 +130,8 @@ def list_documents(category: Optional[str] = None) -> List[DocumentMeta]:
                     status=m.get("status", "pending"),
                     total_chunks=int(m.get("total_chunks", 0)),
                     uploaded_at=m.get("uploaded_at", ""),
-                    processed_at=m.get("processed_at"),
-                    error_message=m.get("error_message"),
+                    processed_at=m.get("processed_at") if m.get("processed_at") != "None" else None,
+                    error_message=m.get("error_message") if m.get("error_message") != "None" else None,
                     file_size=int(m.get("file_size", 0)),
                     category=m.get("category", "default"),
                 ))

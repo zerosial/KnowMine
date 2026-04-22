@@ -16,8 +16,8 @@ async function handleResponse(res) {
 /** 파일 업로드 */
 export async function uploadFile(file, category = "default") {
   const formData = new FormData()
-  formData.append('file', file)
   formData.append('category', category)
+  formData.append('file', file)
 
   const res = await fetch(`${BASE_URL}/upload`, {
     method: 'POST',
