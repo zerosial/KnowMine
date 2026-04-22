@@ -23,8 +23,10 @@ def detect_file_type(filename: str) -> str:
         return "excel"
     elif ext in [".pptx", ".ppt"]:
         return "ppt"
-    elif ext == ".pdf":
-        return "pdf"
+    elif ext == ".md":
+        return "md"
+    elif ext == ".txt":
+        return "txt"
     return "unknown"
 
 
@@ -281,6 +283,24 @@ def parse_pdf(file_bytes: bytes, filename: str) -> str:
 
 
 # ─────────────────────────────────────────────
+# Text / Markdown 파서
+# ─────────────────────────────────────────────
+def parse_text(file_bytes: bytes, filename: str) -> str:
+    """
+    텍스트 또는 Markdown 파일을 파싱.
+    단순 디코딩 지원.
+    """
+    try:
+        text = file_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            text = file_bytes.decode("cp949")
+        except UnicodeDecodeError:
+            text = file_bytes.decode("utf-8", errors="ignore")
+            
+    return f"# 📄 파일: {filename}\n\n{text}\n"
+
+# ─────────────────────────────────────────────
 # 통합 파서
 # ─────────────────────────────────────────────
 def parse_file(file_bytes: bytes, filename: str) -> tuple[str, str]:
@@ -296,6 +316,8 @@ def parse_file(file_bytes: bytes, filename: str) -> tuple[str, str]:
         return parse_pptx(file_bytes, filename), file_type
     elif file_type == "pdf":
         return parse_pdf(file_bytes, filename), file_type
+    elif file_type in ["md", "txt"]:
+        return parse_text(file_bytes, filename), file_type
     else:
         # 알 수 없는 형식은 텍스트로 시도
         try:

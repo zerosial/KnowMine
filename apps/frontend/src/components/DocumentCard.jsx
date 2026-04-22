@@ -5,6 +5,8 @@ const FILE_TYPE_CONFIG = {
   excel:   { icon: '📊', label: 'Excel',       color: '#34d399', bg: 'rgba(52,211,153,0.08)'  },
   ppt:     { icon: '📑', label: 'PowerPoint',  color: '#f97316', bg: 'rgba(249,115,22,0.08)'  },
   pdf:     { icon: '📄', label: 'PDF',         color: '#f87171', bg: 'rgba(248,113,113,0.08)' },
+  md:      { icon: '📝', label: 'Markdown',    color: '#60a5fa', bg: 'rgba(96,165,250,0.08)'  },
+  txt:     { icon: '📃', label: 'Text',        color: '#e2e8f0', bg: 'rgba(226,232,240,0.08)' },
   unknown: { icon: '📁', label: '기타',         color: '#94a3b8', bg: 'rgba(148,163,184,0.08)' },
 }
 

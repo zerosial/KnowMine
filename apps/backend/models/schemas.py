@@ -15,6 +15,8 @@ class FileType(str, Enum):
     EXCEL = "excel"
     PPT = "ppt"
     PDF = "pdf"
+    MD = "md"
+    TXT = "txt"
     UNKNOWN = "unknown"
 
 

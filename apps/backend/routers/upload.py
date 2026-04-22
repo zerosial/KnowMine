@@ -28,6 +28,7 @@ ALLOWED_EXTENSIONS = {
     ".xlsx", ".xls", ".xlsm",
     ".pptx", ".ppt",
     ".pdf",
+    ".md", ".txt"
 }
 
 UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
